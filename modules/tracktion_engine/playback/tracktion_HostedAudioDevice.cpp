@@ -322,10 +322,17 @@ void HostedAudioDeviceInterface::initialise (const Parameters& p)
     parameters = p;
 
     auto& dm = engine.getDeviceManager();
+    auto* adm = dm.getAudioDeviceManager();
+
+    if (adm == nullptr)
+    {
+        TRACKTION_LOG ("HostedAudioDeviceInterface::initialise skipped (no audio device manager)");
+        return;
+    }
 
     // First check for an existing hosted device
     if (deviceType == nullptr)
-        for (auto device : dm.deviceManager.getAvailableDeviceTypes())
+        for (auto device : adm->getAvailableDeviceTypes())
             if (auto hostedAudioDeviceType = dynamic_cast<HostedAudioDeviceType*> (device))
                 deviceType = hostedAudioDeviceType;
 
@@ -333,13 +340,13 @@ void HostedAudioDeviceInterface::initialise (const Parameters& p)
     if (deviceType == nullptr)
     {
         deviceType = new HostedAudioDeviceType (*this);
-        dm.deviceManager.addAudioDeviceType (std::unique_ptr<HostedAudioDeviceType> (deviceType));
+        adm->addAudioDeviceType (std::unique_ptr<HostedAudioDeviceType> (deviceType));
     }
 
-    dm.deviceManager.setCurrentAudioDeviceType ("Hosted Device", true);
+    adm->setCurrentAudioDeviceType ("Hosted Device", true);
     dm.initialise (parameters.inputChannels, parameters.outputChannels);
-    jassert (dm.deviceManager.getCurrentAudioDeviceType() == "Hosted Device");
-    jassert (dm.deviceManager.getCurrentDeviceTypeObject() == deviceType);
+    jassert (adm->getCurrentAudioDeviceType() == "Hosted Device");
+    jassert (adm->getCurrentDeviceTypeObject() == deviceType);
 
     // Outputs
     {

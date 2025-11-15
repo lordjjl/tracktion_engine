@@ -8,6 +8,8 @@
     Tracktion Engine uses a GPL/commercial licence - see LICENCE.md for details.
 */
 
+#include <memory>
+
 namespace tracktion { inline namespace engine
 {
 
@@ -24,7 +26,7 @@ class DeviceManager     : public juce::ChangeBroadcaster,
                           private juce::Timer
 {
     friend class Engine;
-    DeviceManager (Engine&);
+    DeviceManager (Engine&, bool allowHardwareAccess = true);
 
 public:
     //==============================================================================
@@ -208,7 +210,11 @@ public:
         Engine& engine;
     };
 
-    TracktionEngineAudioDeviceManager deviceManager { engine };
+    TracktionEngineAudioDeviceManager* getAudioDeviceManager() const noexcept;
+    bool isHardwareAccessEnabled() const noexcept        { return hardwareEnabled; }
+
+    std::unique_ptr<TracktionEngineAudioDeviceManager> deviceManager;
+    const bool hardwareEnabled;
 
     //==============================================================================
     std::unique_ptr<HostedAudioDeviceInterface> hostedAudioDeviceInterface;

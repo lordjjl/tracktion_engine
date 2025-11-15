@@ -166,7 +166,8 @@ public:
         auto& deviceManager = Engine::getEngines()[0]->getDeviceManager();
         deviceManager.closeDevices();
         deviceManager.removeHostedAudioDeviceInterface();
-        deviceManager.deviceManager.closeAudioDevice();
+        if (auto* adm = deviceManager.getAudioDeviceManager())
+            adm->closeAudioDevice();
     }
 
     //==============================================================================

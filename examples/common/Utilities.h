@@ -109,10 +109,19 @@ namespace EngineHelpers
         DialogWindow::LaunchOptions o;
         o.dialogTitle = TRANS("Audio Settings");
         o.dialogBackgroundColour = LookAndFeel::getDefaultLookAndFeel().findColour (ResizableWindow::backgroundColourId);
-        o.content.setOwned (new AudioDeviceSelectorComponent (engine.getDeviceManager().deviceManager,
-                                                              0, 512, 1, 512, false, false, true, true));
-        o.content->setSize (400, 600);
-        o.launchAsync();
+        if (auto* adm = engine.getDeviceManager().getAudioDeviceManager())
+        {
+            o.content.setOwned (new AudioDeviceSelectorComponent (*adm,
+                                                                  0, 512, 1, 512, false, false, true, true));
+            o.content->setSize (400, 600);
+            o.launchAsync();
+        }
+        else
+        {
+            AlertWindow::showMessageBoxAsync (AlertWindow::WarningIcon,
+                                              TRANS("Audio Settings"),
+                                              TRANS("Audio device settings are unavailable in headless mode."));
+        }
     }
 
     inline void browseForAudioFile (te::Engine& engine, std::function<void (const File&)> fileChosenCallback)

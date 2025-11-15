@@ -252,7 +252,7 @@ public:
     /** Returns the processed audio and MIDI output.
         Must only be called after hasProcessed returns true.
     */
-    AudioAndMidiBuffer getProcessedOutput();
+    virtual AudioAndMidiBuffer getProcessedOutput();
 
     //==============================================================================
     struct TransformOptions

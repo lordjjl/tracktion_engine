@@ -177,24 +177,33 @@ namespace tracktion::inline engine
             auto latencyTesterResult = [&]
             {
                 std::optional<int> foundOffset;
-                test_utilities::LatencyTester tester (dm.deviceManager,
-                                                      [&foundOffset] (auto result)
-                                                      { foundOffset = result; });
+                test_utilities::LatencyTester* testerPtr = nullptr;
+                if (auto* adm = dm.getAudioDeviceManager())
+                {
+                    testerPtr = new test_utilities::LatencyTester (*adm,
+                                                                   [&foundOffset] (auto result)
+                                                                   { foundOffset = result; });
+                }
+                else
+                {
+                    FAIL ("No audio device manager available for latency tester");
+                }
 
                 // N.B. For testing purposes, we need to remove the DeviceManager from the callback as
                 // the HostedAudioDevice has a single buffer that will be cleared by the device manager,
                 // breaking the loop-back
                 dm.closeDevices();
-                tester.beginTest();
+                testerPtr->beginTest();
 
                 {
                     const auto numFramesToProcess = toSamples (3_td, player.getParams().sampleRate);
                     processLoopedBack (player, numFramesToProcess);
                 }
 
-                CHECK (tester.tryToEndTest());
+                CHECK (testerPtr->tryToEndTest());
                 CHECK (foundOffset);
                 const auto res = test_utilities::getLatencyTesterResult (dm, *foundOffset);
+                delete testerPtr;
 
                 // Restart the device to add it back to the EnginePlayer's callbacks
                 dm.initialise();

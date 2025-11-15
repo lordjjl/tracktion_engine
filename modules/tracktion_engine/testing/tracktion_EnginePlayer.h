@@ -36,7 +36,8 @@ public:
 
     ~EnginePlayer()
     {
-        engine.getDeviceManager().deviceManager.closeAudioDevice();
+        if (auto* adm = engine.getDeviceManager().getAudioDeviceManager())
+            adm->closeAudioDevice();
         engine.getDeviceManager().removeHostedAudioDeviceInterface();
         assert (! engine.getDeviceManager().isHostedAudioDeviceInterfaceInUse());
     }

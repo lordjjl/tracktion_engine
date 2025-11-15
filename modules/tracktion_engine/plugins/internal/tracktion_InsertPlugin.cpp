@@ -119,14 +119,15 @@ void InsertPlugin::initialiseWithoutStopping (const PluginInitialisationInfo& in
     // It should be accurate on well reporting devices though
     int latency = static_cast<int> (timeToSample (manualAdjustMs / 1000.0, info.sampleRate));
 
-    if (auto device = engine.getDeviceManager().deviceManager.getCurrentAudioDevice())
-    {
-        if (sendDeviceType == audioDevice)
-            latency += device->getOutputLatencyInSamples();
+    if (auto* adm = engine.getDeviceManager().getAudioDeviceManager())
+        if (auto device = adm->getCurrentAudioDevice())
+        {
+            if (sendDeviceType == audioDevice)
+                latency += device->getOutputLatencyInSamples();
 
-        if (returnDeviceType == audioDevice)
-            latency += device->getInputLatencyInSamples();
-    }
+            if (returnDeviceType == audioDevice)
+                latency += device->getInputLatencyInSamples();
+        }
 
     latency = std::max (0, latency);
     latencyNumSamples = latency;

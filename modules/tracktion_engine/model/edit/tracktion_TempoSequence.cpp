@@ -588,9 +588,14 @@ void TempoSequence::updateTempoData()
     jassert (getNumTempos() > 0 && getNumTimeSigs() > 0);
     triggerAsyncUpdate();
 
+    if (auto* adm = edit.engine.getDeviceManager().getAudioDeviceManager())
     {
         //TODO: This lock should be removed when all playback classes are using the new tempo::Sequence class
-        juce::ScopedLock sl (edit.engine.getDeviceManager().deviceManager.getAudioCallbackLock());
+        juce::ScopedLock sl (adm->getAudioCallbackLock());
+        internalSequence = std::move (newSeq);
+    }
+    else
+    {
         internalSequence = std::move (newSeq);
     }
 }

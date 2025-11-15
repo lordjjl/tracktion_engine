@@ -44,29 +44,36 @@ TEST_SUITE ("tracktion_engine")
                                                        .inputNames = {}, .outputNames = {} });
 
         std::optional<int> foundOffset;
-        test_utilities::LatencyTester tester (engine.getDeviceManager().deviceManager,
-                                              [&foundOffset] (auto result)
-                                              { foundOffset = result; });
+        if (auto* adm = engine.getDeviceManager().getAudioDeviceManager())
+        {
+            test_utilities::LatencyTester tester (*adm,
+                                                  [&foundOffset] (auto result)
+                                                  { foundOffset = result; });
 
         // N.B. For testing purposes, we need to remove the DeviceManager from the callback as
         // the HostedAudioDevice has a single buffer that will be cleared by the device manager,
         // breaking the loop-back
         engine.getDeviceManager().closeDevices();
-        tester.beginTest();
+            engine.getDeviceManager().closeDevices();
+            tester.beginTest();
 
         {
             const auto numFramesToProcess = toSamples (3_td, player.getParams().sampleRate);
             processLoopedBack (player, numFramesToProcess);
         }
 
-        CHECK(tester.tryToEndTest());
-        CHECK(foundOffset);
+            CHECK(tester.tryToEndTest());
+            CHECK(foundOffset);
 
-        // N.B. We're expecting a block size offset here
-        CHECK_EQ(*foundOffset, player.getParams().blockSize);
+            // N.B. We're expecting a block size offset here
+            CHECK_EQ(*foundOffset, player.getParams().blockSize);
 
-        auto res = test_utilities::getLatencyTesterResult (engine.getDeviceManager(), *foundOffset);
-        CHECK_EQ(res.adjustedNumSamples, player.getParams().blockSize);
+            auto res = test_utilities::getLatencyTesterResult (engine.getDeviceManager(), *foundOffset);
+            CHECK_EQ(res.adjustedNumSamples, player.getParams().blockSize);
+            return;
+        }
+
+        FAIL ("No audio device manager available for latency test");
     }
 
     TEST_CASE("LatencyTester: Device latency")
@@ -80,7 +87,9 @@ TEST_SUITE ("tracktion_engine")
                                                        .outputLatencyNumSamples = outputLatencyNumSamples });
 
         std::optional<int> foundOffset;
-        test_utilities::LatencyTester tester (engine.getDeviceManager().deviceManager,
+        auto* adm = engine.getDeviceManager().getAudioDeviceManager();
+        REQUIRE (adm != nullptr);
+        test_utilities::LatencyTester tester (*adm,
                                               [&foundOffset] (auto result)
                                               { foundOffset = result; });
 

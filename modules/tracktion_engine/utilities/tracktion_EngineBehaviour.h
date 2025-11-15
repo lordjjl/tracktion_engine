@@ -91,6 +91,8 @@ public:
     /// If false, it'll only open an output device. (This won't prevent your app
     /// opening an input device later if you allow the user to do that)
     virtual bool shouldOpenAudioInputByDefault()                                    { return true; }
+    /// Override to disable construction of hardware-backed device managers entirely.
+    virtual bool allowDeviceManagerHardwareAccess() const                           { return true; }
 
     /// If this returns true, you must implement describeWaveDevices to determine the wave devices for a given device.
     /// If it's false, a standard, stereo pair layout will be automatically generated.
