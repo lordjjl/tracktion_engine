@@ -18,13 +18,31 @@ namespace tracktion { inline namespace engine
 static Engine* instance = nullptr;
 static juce::Array<Engine*> engines;
 
-#if JUCE_DEBUG || JUCE_UNIT_TESTS
 namespace
 {
+    bool isTruthyEnvFlag (const char* name)
+    {
+        if (name == nullptr)
+            return false;
+
+        const auto value = juce::SystemStats::getEnvironmentVariable (name, {}).trim();
+        return value == "1" || value.equalsIgnoreCase ("true") || value.equalsIgnoreCase ("yes");
+    }
+
+    bool shouldTraceTracktionEngine()
+    {
+        static const bool enabled = isTruthyEnvFlag ("BATCHY_TRACKTION_ENGINE_TRACE");
+        return enabled;
+    }
+
+   #if JUCE_DEBUG || JUCE_UNIT_TESTS
     std::atomic<int> liveEngineCount { 0 };
 
     void logEngineLifecycleEvent (const char* action, const Engine* engine, int remaining)
     {
+        if (! shouldTraceTracktionEngine())
+            return;
+
         const auto pointerValue = static_cast<juce::uint64> (reinterpret_cast<uintptr_t> (engine));
         juce::String message (juce::String ("[TracktionEngine] Engine ")
                                 + action
@@ -36,8 +54,8 @@ namespace
         juce::Logger::writeToLog (message);
         std::cout << message << std::endl;
     }
+   #endif
 }
-#endif
 
 Engine::Engine (std::unique_ptr<PropertyStorage> ps, std::unique_ptr<UIBehaviour> ub, std::unique_ptr<EngineBehaviour> eb)
 {
@@ -80,6 +98,9 @@ void Engine::initialise()
 {
     const auto logInitStep = [](const char* message)
     {
+        if (! shouldTraceTracktionEngine())
+            return;
+
         const juce::String msg (message);
         juce::Logger::writeToLog (msg);
         std::cout << msg << std::endl;

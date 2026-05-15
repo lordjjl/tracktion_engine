@@ -13,6 +13,15 @@ juce::AudioDeviceManager* gDeviceManager = nullptr; // TODO
 namespace tracktion { inline namespace engine
 {
 
+namespace
+{
+    bool shouldTraceTracktionDeviceManager()
+    {
+        const auto value = juce::SystemStats::getEnvironmentVariable ("BATCHY_TRACKTION_ENGINE_TRACE", {}).trim();
+        return value == "1" || value.equalsIgnoreCase ("true") || value.equalsIgnoreCase ("yes");
+    }
+}
+
 #if TRACKTION_LOG_DEVICES
  #define TRACKTION_LOG_DEVICE(text) TRACKTION_LOG(text)
 #else
@@ -81,8 +90,11 @@ static bool isMicrosoftGSSynth (MidiOutputDevice& mo)
 //==============================================================================
 DeviceManager::TracktionEngineAudioDeviceManager::TracktionEngineAudioDeviceManager (Engine& e) : engine (e)
 {
-    juce::Logger::writeToLog ("[TracktionEngine] TracktionEngineAudioDeviceManager ctor entry");
-    std::cout << "[TracktionEngine] TracktionEngineAudioDeviceManager ctor entry" << std::endl;
+    if (shouldTraceTracktionDeviceManager())
+    {
+        juce::Logger::writeToLog ("[TracktionEngine] TracktionEngineAudioDeviceManager ctor entry");
+        std::cout << "[TracktionEngine] TracktionEngineAudioDeviceManager ctor entry" << std::endl;
+    }
 }
 
 DeviceManager::TracktionEngineAudioDeviceManager* DeviceManager::getAudioDeviceManager() const noexcept
@@ -402,10 +414,13 @@ DeviceManager::DeviceManager (Engine& e, bool allowHardware)
     , hardwareEnabled (allowHardware)
 {
     CRASH_TRACER
-    juce::Logger::writeToLog ("[TracktionEngine] DeviceManager::DeviceManager entry (hardware "
-                               + juce::String (hardwareEnabled ? "enabled" : "disabled") + ")");
-    std::cout << "[TracktionEngine] DeviceManager::DeviceManager entry (hardware "
-              << (hardwareEnabled ? "enabled" : "disabled") << ")" << std::endl;
+    if (shouldTraceTracktionDeviceManager())
+    {
+        juce::Logger::writeToLog ("[TracktionEngine] DeviceManager::DeviceManager entry (hardware "
+                                   + juce::String (hardwareEnabled ? "enabled" : "disabled") + ")");
+        std::cout << "[TracktionEngine] DeviceManager::DeviceManager entry (hardware "
+                  << (hardwareEnabled ? "enabled" : "disabled") << ")" << std::endl;
+    }
 
     prepareToStartCaller = std::make_unique<PrepareToStartCaller> (*this);
 
