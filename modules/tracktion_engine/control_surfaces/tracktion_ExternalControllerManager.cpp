@@ -11,6 +11,15 @@
 namespace tracktion { inline namespace engine
 {
 
+namespace
+{
+    bool shouldTraceTracktionEngine()
+    {
+        const auto value = juce::SystemStats::getEnvironmentVariable ("BATCHY_TRACKTION_ENGINE_TRACE", {}).trim();
+        return value == "1" || value.equalsIgnoreCase ("true") || value.equalsIgnoreCase ("yes");
+    }
+}
+
 bool ColourArea::contains (ClipSlot& clipSlot) const
 {
     auto t1 = firstTrack.getIndexInEditTrackList();
@@ -224,7 +233,8 @@ ExternalControllerManager::~ExternalControllerManager()
 void ExternalControllerManager::initialise()
 {
     CRASH_TRACER
-    TRACKTION_LOG ("Creating Default Controllers...");
+    if (shouldTraceTracktionEngine())
+        TRACKTION_LOG ("Creating Default Controllers...");
 
    #if TRACKTION_ENABLE_CONTROL_SURFACES
     auto controllers = engine.getEngineBehaviour().getDesiredControlSurfaces();
