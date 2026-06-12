@@ -891,7 +891,6 @@ void Edit::initialise (const Options& options)
 
     getUndoManager().clearUndoHistory();
 
-    DBG ("Edit loaded in: " << loadTimer.getDescription());
 }
 
 void Edit::initialiseTempoAndPitch()
