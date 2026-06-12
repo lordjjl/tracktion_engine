@@ -145,7 +145,6 @@ static void deleteEditPreviewsNotInUse (Engine& engine, juce::Array<juce::File>&
 void TemporaryFileManager::cleanUp()
 {
     CRASH_TRACER
-    TRACKTION_LOG ("Cleaning up temp files..");
 
     auto tempFiles = tempDir.findChildFiles (juce::File::findFiles, true);
 
