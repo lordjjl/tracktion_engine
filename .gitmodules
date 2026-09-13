@@ -1,4 +1,4 @@
 [submodule "modules/juce"]
 	path = modules/juce
 	url = https://github.com/lordjjl/JUCE.git
-	branch = batchy-modifications
+	branch = batchy-vendor
