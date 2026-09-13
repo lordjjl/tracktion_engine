@@ -155,18 +155,40 @@ void TemporaryFileManager::cleanUp()
     for (auto& f : tempFiles)
         totalBytes += f.getSize();
 
-    std::sort (tempFiles.begin(), tempFiles.end(),
-               [] (const juce::File& first, const juce::File& second) -> bool
-               {
-                   return first.getLastAccessTime().toMilliseconds() < second.getLastAccessTime().toMilliseconds();
-               });
+    struct TempFileSortEntry
+    {
+        juce::File file;
+        int64_t lastAccessTimeMs = 0;
+        juce::String fullPath;
+    };
 
-    auto numFiles = tempFiles.size();
-    auto maxNumFiles = getMaxNumTempFiles();
-    auto maxSizeToKeep = getMaxSpaceAllowedForTempFiles();
+    juce::Array<TempFileSortEntry> sortedTempFiles;
+    sortedTempFiles.ensureStorageAllocated (tempFiles.size());
 
     for (auto& f : tempFiles)
     {
+        sortedTempFiles.add ({ f,
+                               f.getLastAccessTime().toMilliseconds(),
+                               f.getFullPathName() });
+    }
+
+    std::sort (sortedTempFiles.begin(), sortedTempFiles.end(),
+               [] (const TempFileSortEntry& first, const TempFileSortEntry& second) -> bool
+               {
+                   if (first.lastAccessTimeMs != second.lastAccessTimeMs)
+                       return first.lastAccessTimeMs < second.lastAccessTimeMs;
+
+                   return first.fullPath < second.fullPath;
+               });
+
+    auto numFiles = sortedTempFiles.size();
+    auto maxNumFiles = getMaxNumTempFiles();
+    auto maxSizeToKeep = getMaxSpaceAllowedForTempFiles();
+
+    for (auto& entry : sortedTempFiles)
+    {
+        auto& f = entry.file;
+
         if (shouldDeleteTempFile (f, totalBytes > maxSizeToKeep || numFiles > maxNumFiles))
         {
             totalBytes -= f.getSize();
