@@ -63,6 +63,12 @@ public:
     /** Destructor. */
     ~TransportControl() override;
 
+    /** Stops internal maintenance timers before an owning Edit is intentionally
+        quarantined/leaked during emergency teardown. The transport must not be
+        used for playback after this call.
+    */
+    void quiesceForLeakedEdit() noexcept;
+
     //==============================================================================
     /** Starts playback of an Edit.
         @param justSendMMCIfEnabled If this is true, playback isn't actually started,
@@ -307,6 +313,13 @@ public:
     /** Returns all the active TransportControl[s] in the Engine. */
     static juce::Array<TransportControl*> getAllActiveTransports (Engine&);
 
+    /** Stops non-playback maintenance timers owned by all active transports in
+        the Engine. This is intended for engine/edit teardown paths; transports
+        must not be used for normal playback after this call without rebuilding
+        their owning Edit state.
+    */
+    static void quiesceMaintenanceTimersForEngine (Engine&) noexcept;
+
     /** Returns the number of Edits currently playing. */
     static int getNumPlayingTransports (Engine&);
 
@@ -454,6 +467,7 @@ private:
     struct ButtonRepeater;
     std::unique_ptr<ButtonRepeater> rwRepeater, ffRepeater;
 
+    void quiesceMaintenanceTimers() noexcept;
     void timerCallback() override;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (TransportControl)

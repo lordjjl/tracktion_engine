@@ -171,8 +171,12 @@ void Engine::initialise()
 
 Engine::~Engine()
 {
+    TransportControl::quiesceMaintenanceTimersForEngine (*this);
+
     // First make sure to clear any edits that are in line to be deleted
     editDeleter.reset();
+
+    TransportControl::quiesceMaintenanceTimersForEngine (*this);
 
     getProjectManager().saveList();
 

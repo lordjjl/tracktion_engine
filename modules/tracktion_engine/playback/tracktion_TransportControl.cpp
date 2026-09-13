@@ -41,6 +41,68 @@ namespace IDs
     #undef DECLARE_ID
 }
 
+namespace
+{
+    bool invokeTransportTeardownOnMessageThread (std::function<void()> work) noexcept
+    {
+        try
+        {
+            auto* mm = juce::MessageManager::getInstanceWithoutCreating();
+
+            if (mm == nullptr
+                 || mm->isThisTheMessageThread()
+                 || mm->currentThreadHasLockedMessageManager())
+            {
+                work();
+                return true;
+            }
+
+            struct InvokeState
+            {
+                juce::WaitableEvent done;
+                std::atomic<bool> cancelled { false };
+                std::atomic<bool> started { false };
+                std::atomic<bool> completed { false };
+                std::function<void()> callback;
+            };
+
+            auto state = std::make_shared<InvokeState>();
+            state->callback = std::move (work);
+
+            const bool posted = juce::MessageManager::callAsync ([state]
+            {
+                state->started.store (true, std::memory_order_release);
+
+                if (! state->cancelled.load (std::memory_order_acquire))
+                    state->callback();
+
+                state->completed.store (true, std::memory_order_release);
+                state->done.signal();
+            });
+
+            if (! posted)
+                return false;
+
+            if (state->done.wait (5000))
+                return state->completed.load (std::memory_order_acquire);
+
+            state->cancelled.store (true, std::memory_order_release);
+
+            if (state->started.load (std::memory_order_acquire)
+                 && ! state->completed.load (std::memory_order_acquire))
+            {
+                state->done.wait (-1);
+                return state->completed.load (std::memory_order_acquire);
+            }
+        }
+        catch (...)
+        {
+        }
+
+        return false;
+    }
+}
+
 namespace TransportHelpers
 {
     inline TimePosition snapTime (TransportControl& tc, TimePosition t, bool invertSnap)
@@ -706,13 +768,31 @@ TransportControl::TransportControl (Edit& ed, const juce::ValueTree& v)
 
 TransportControl::~TransportControl()
 {
-    stopTimer();
-
-    activeTransportControls.removeAllInstancesOf (this);
-    fileFlushTimer = nullptr;
+    quiesceMaintenanceTimers();
 
     CRASH_TRACER
     stop (false, true);
+}
+
+void TransportControl::quiesceForLeakedEdit() noexcept
+{
+    quiesceMaintenanceTimers();
+}
+
+void TransportControl::quiesceMaintenanceTimers() noexcept
+{
+    auto stopTimers = [this]
+    {
+        stopTimer();
+        sectionPlayer.reset();
+        activeTransportControls.removeAllInstancesOf (this);
+        fileFlushTimer = nullptr;
+        rwRepeater = nullptr;
+        ffRepeater = nullptr;
+    };
+
+    if (! invokeTransportTeardownOnMessageThread (stopTimers))
+        stopTimers();
 }
 
 //==============================================================================
@@ -724,6 +804,19 @@ juce::Array<TransportControl*> TransportControl::getAllActiveTransports (Engine&
         controls.add (&edit->getTransport());
 
     return controls;
+}
+
+void TransportControl::quiesceMaintenanceTimersForEngine (Engine& engine) noexcept
+{
+    try
+    {
+        for (auto* tc : getAllActiveTransports (engine))
+            if (tc != nullptr)
+                tc->quiesceMaintenanceTimers();
+    }
+    catch (...)
+    {
+    }
 }
 
 int TransportControl::getNumPlayingTransports (Engine& engine)
@@ -868,7 +961,8 @@ void TransportControl::triggerClearDevicesOnStop()
 
 void TransportControl::forceOrphanFreezeAndProxyFilesPurge()
 {
-    fileFlushTimer->forcePurge = true;
+    if (fileFlushTimer != nullptr)
+        fileFlushTimer->forcePurge = true;
 }
 
 //==============================================================================
