@@ -60,8 +60,7 @@ namespace
             struct InvokeState
             {
                 juce::WaitableEvent done;
-                std::atomic<bool> cancelled { false };
-                std::atomic<bool> started { false };
+                std::atomic<bool> claimed { false };
                 std::atomic<bool> completed { false };
                 std::function<void()> callback;
             };
@@ -71,9 +70,17 @@ namespace
 
             const bool posted = juce::MessageManager::callAsync ([state]
             {
-                state->started.store (true, std::memory_order_release);
-
-                if (! state->cancelled.load (std::memory_order_acquire))
+                // Single atomic claim: whichever side (this callback, or the
+                // caller's post-timeout fallback below) wins the exchange is
+                // the only one that runs the work. The previous scheme used
+                // two separate flags (cancelled/started) written and read
+                // Dekker-style with no shared total order between them, so
+                // both the caller and this callback could observe stale
+                // values and BOTH would run the teardown concurrently
+                // (double stopTimer/reset/removeAllInstancesOf -> double
+                // free). A single atomic RMW has one modification order, so
+                // exactly one side can ever see exchange() return false.
+                if (! state->claimed.exchange (true, std::memory_order_acq_rel))
                     state->callback();
 
                 state->completed.store (true, std::memory_order_release);
@@ -86,14 +93,21 @@ namespace
             if (state->done.wait (5000))
                 return state->completed.load (std::memory_order_acquire);
 
-            state->cancelled.store (true, std::memory_order_release);
-
-            if (state->started.load (std::memory_order_acquire)
-                 && ! state->completed.load (std::memory_order_acquire))
+            if (! state->claimed.exchange (true, std::memory_order_acq_rel))
             {
-                state->done.wait (-1);
-                return state->completed.load (std::memory_order_acquire);
+                // We claimed it first: the message thread callback will see
+                // claimed == true and skip the work, so it's safe for the
+                // caller to run the inline fallback itself and return now.
+                return false;
             }
+
+            // The message thread already claimed the work and may be
+            // executing it on `this` right now. We must not return (and let
+            // the caller proceed, possibly destroying `this`) until that
+            // work has actually finished, so this wait is intentionally
+            // unbounded rather than reusing the 5s budget above.
+            state->done.wait (-1);
+            return state->completed.load (std::memory_order_acquire);
         }
         catch (...)
         {
