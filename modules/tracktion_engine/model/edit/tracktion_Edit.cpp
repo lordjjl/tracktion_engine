@@ -734,6 +734,12 @@ Edit::~Edit()
 
     pluginChangeTimer.reset();
 
+    // Batchy patch: destroy the undo transaction listener before clearing the
+    // undo history. clearUndoHistory() posts an async ChangeBroadcaster update;
+    // if UndoTransactionTimer remains registered until after that call, a later
+    // message-pump drain can invoke changeListenerCallback on the destroyed
+    // timer and restart its JUCE Timer through torn-down storage.
+    undoTransactionTimer.reset();
     undoManager.clearUndoHistory();
 
     if (rackTypes->isInitialised())
@@ -749,7 +755,6 @@ Edit::~Edit()
     trackList.reset();
     mirroredPluginUpdateTimer.reset();
     rackTypes.reset();
-    undoTransactionTimer.reset();
     markerManager.reset();
     araDocumentHolder.reset();
     frozenTrackCallback.reset();
