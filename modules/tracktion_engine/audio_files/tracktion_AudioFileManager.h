@@ -60,6 +60,9 @@ private:
     friend class SmartThumbnail;
     std::unique_ptr<juce::AudioThumbnailCache> thumbnailCache;
     std::set<size_t> thumbnailTypeHashes;
+    // Shared by message-thread registration and thumbnail-cache worker lookup.
+    // Never hold this lock while clearing a thumbnail (which drains the worker).
+    juce::CriticalSection thumbnailMapLock;
     std::unordered_map<const juce::AudioThumbnailBase*, SmartThumbnail*> thumbnailMap;
     juce::Array<SmartThumbnail*> activeThumbnails;
     juce::CriticalSection activeThumbnailLock;

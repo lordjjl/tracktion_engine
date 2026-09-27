@@ -453,7 +453,9 @@ private:
 
     SmartThumbnail* getActiveSmartThumbnail (const juce::AudioThumbnailBase& thumb)
     {
-        auto& map = engine.getAudioFileManager().thumbnailMap;
+        auto& fileManager = engine.getAudioFileManager();
+        const juce::ScopedLock sl (fileManager.thumbnailMapLock);
+        auto& map = fileManager.thumbnailMap;
 
         if (auto found = map.find (&thumb); found != map.end())
             return found->second;
@@ -506,7 +508,10 @@ SmartThumbnail::SmartThumbnail (Engine& e, const AudioFile& f, juce::Component& 
     assert (thumbnail && "thumbnail must be valid!");
     startTimer (initialTimerDelay);
     engine.getAudioFileManager().activeThumbnails.add (this);
-    engine.getAudioFileManager().thumbnailMap[thumbnail.get()] = this;
+    {
+        const juce::ScopedLock sl (engine.getAudioFileManager().thumbnailMapLock);
+        engine.getAudioFileManager().thumbnailMap[thumbnail.get()] = this;
+    }
 
     // Ensure the AudioFileManager knows about this type of thumbnail
     auto& thumbRef = *thumbnail; // Work around a clang warning
@@ -518,8 +523,13 @@ SmartThumbnail::~SmartThumbnail()
 {
     TRACKTION_ASSERT_MESSAGE_THREAD
 
-    engine.getAudioFileManager().thumbnailMap.erase (thumbnail.get());
+    {
+        const juce::ScopedLock sl (engine.getAudioFileManager().thumbnailMapLock);
+        engine.getAudioFileManager().thumbnailMap.erase (thumbnail.get());
+    }
     engine.getAudioFileManager().activeThumbnails.removeAllInstancesOf (this);
+    // A callback may already hold this SmartThumbnail pointer. Drain it before
+    // members are destroyed, without holding the registry lock it may need.
     thumbnail->clear();
 }
 
