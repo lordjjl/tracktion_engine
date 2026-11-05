@@ -512,7 +512,7 @@ public:
     choc::buffer::InterleavedBuffer<float> interleavedInputScratchBuffer    { choc::buffer::createInterleavedBuffer (numChannels, chunkSize, [] { return 0.0f; }) };
     choc::buffer::InterleavedBuffer<float> interleavedOutputScratchBuffer   { interleavedInputScratchBuffer };
 
-    double speedRatio = 1.0, readPosition = 0.0;
+    double speedRatio = 1.0, readPosition = 0.0, lastRatio = 0.0;
     float gains[2] = { 1.0f, 1.0f };
     bool failedToRead = false;
 
@@ -555,6 +555,14 @@ public:
         const auto ratio = sampleRatio * speedRatio;
         assert (ratio > 0.0);
 
+        // The caller sets one speed per block. Step to it rather than letting libsamplerate
+        // glide from the previous ratio across this chunk, so the audio stays at readPosition.
+        if (ratio != lastRatio)
+        {
+            src::src_set_ratio (src_state, 1.0 / ratio);
+            lastRatio = ratio;
+        }
+
         const auto numRead = src_callback_read (src_state, 1.0 / ratio,
                                                 static_cast<long> (numFramesToDo),
                                                 interleavedOutputScratchBuffer.getView().data.data);
@@ -567,7 +575,10 @@ public:
         }
 
         choc::buffer::copy (destBuffer, interleavedOutputScratchBuffer.getStart (numFramesToDo));
-        readPosition += numFramesToDo;
+        // Source time advances by speedRatio per output frame. Without the factor the next
+        // block's setPosition sees a gap, re-seeks and calls src_reset at every block when
+        // speedRatio != 1, restarting the sinc filter mid-waveform.
+        readPosition += numFramesToDo * speedRatio;
 
         return true;
     }
